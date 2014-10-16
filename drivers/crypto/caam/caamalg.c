@@ -83,6 +83,13 @@
 					 CAAM_MAX_KEY_SIZE)
 #define DESC_MAX_USED_LEN		(DESC_MAX_USED_BYTES / CAAM_CMD_SZ)
 
+/* context register field constants for XTS */
+#define CONTEXT_SECIDX_OFFSET		(32 << LDST_OFFSET_SHIFT)
+#define CONTEXT_SECIDX_LENGTH		8
+#define CONTEXT_SECSZ_OFFSET		(40 << LDST_OFFSET_SHIFT)
+#define CONTEXT_SECSZ_LENGTH		8
+#define SECTOR_SIZE			512
+
 #ifdef DEBUG
 /* for print_hex_dumps with line references */
 #define debug(format, arg...) printk(format, arg)
@@ -951,8 +958,18 @@ static int ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
 	append_cmd(desc, SET_OK_NO_PROP_ERRORS | CMD_LOAD);
 
 	/* Load iv */
-	append_cmd(desc, CMD_SEQ_LOAD | LDST_SRCDST_BYTE_CONTEXT |
-		   LDST_CLASS_1_CCB | tfm->ivsize);
+	if ((ctx->class1_alg_type & (OP_ALG_AAI_MASK << OP_ALG_AAI_SHIFT)) == OP_ALG_AAI_XTS) {
+		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
+			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECIDX_OFFSET |
+			   tfm->ivsize);
+		append_cmd(desc, CMD_LOAD | LDST_CLASS_1_CCB | LDST_IMM |
+			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECSZ_OFFSET |
+			   CONTEXT_SECSZ_LENGTH);
+		append_u64(desc, SECTOR_SIZE);
+	} else {
+		append_cmd(desc, CMD_SEQ_LOAD | LDST_SRCDST_BYTE_CONTEXT |
+			   LDST_CLASS_1_CCB | tfm->ivsize);
+	}
 
 	/* Load operation */
 	append_operation(desc, ctx->class1_alg_type |
@@ -994,8 +1011,18 @@ static int ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
 	set_jump_tgt_here(desc, jump_cmd);
 
 	/* load IV */
-	append_cmd(desc, CMD_SEQ_LOAD | LDST_SRCDST_BYTE_CONTEXT |
-		   LDST_CLASS_1_CCB | tfm->ivsize);
+	if ((ctx->class1_alg_type & (OP_ALG_AAI_MASK << OP_ALG_AAI_SHIFT)) == OP_ALG_AAI_XTS) {
+		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
+			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECIDX_OFFSET |
+			   tfm->ivsize);
+		append_cmd(desc, CMD_LOAD | LDST_CLASS_1_CCB | LDST_IMM |
+			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECSZ_OFFSET |
+			   CONTEXT_SECSZ_LENGTH);
+		append_u64(desc, SECTOR_SIZE);
+	} else {
+		append_cmd(desc, CMD_SEQ_LOAD | LDST_SRCDST_BYTE_CONTEXT |
+			   LDST_CLASS_1_CCB | tfm->ivsize);
+	}
 
 	/* Choose operation */
 	append_dec_op1(desc, ctx->class1_alg_type);
@@ -2757,6 +2784,22 @@ static struct caam_alg_template driver_algs[] = {
 			.ivsize = DES_BLOCK_SIZE,
 			},
 		.class1_alg_type = OP_ALG_ALGSEL_DES | OP_ALG_AAI_CBC,
+		.min_era = 2,
+	},
+	{
+		.name = "xts(aes)",
+		.driver_name = "xts-aes-caam",
+		.blocksize = AES_BLOCK_SIZE,
+		.type = CRYPTO_ALG_TYPE_ABLKCIPHER,
+		.template_ablkcipher = {
+			.setkey = ablkcipher_setkey,
+			.encrypt = ablkcipher_encrypt,
+			.decrypt = ablkcipher_decrypt,
+			.min_keysize = 2 * AES_MIN_KEY_SIZE,
+			.max_keysize = 2 * AES_MAX_KEY_SIZE,
+			.ivsize = AES_BLOCK_SIZE / 2,
+			},
+		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_XTS,
 		.min_era = 2,
 	}
 };

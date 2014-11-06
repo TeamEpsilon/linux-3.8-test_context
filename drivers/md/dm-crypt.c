@@ -721,10 +721,12 @@ static int crypt_convert_block(struct crypt_config *cc,
 	ablkcipher_request_set_crypt(req, &dmreq->sg_in, &dmreq->sg_out,
 				     1 << SECTOR_SHIFT, iv);
 
-	if (bio_data_dir(ctx->bio_in) == WRITE)
-		r = crypto_ablkcipher_encrypt(req);
-	else
-		r = crypto_ablkcipher_decrypt(req);
+	do {
+		if (bio_data_dir(ctx->bio_in) == WRITE)
+			r = crypto_ablkcipher_encrypt(req);
+		else
+			r = crypto_ablkcipher_decrypt(req);
+	} while (r == -EBUSY);
 
 	if (!r && cc->iv_gen_ops && cc->iv_gen_ops->post)
 		r = cc->iv_gen_ops->post(cc, iv, dmreq);

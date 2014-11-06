@@ -957,6 +957,9 @@ static int ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
 	/* Propagate errors from shared to job descriptor */
 	append_cmd(desc, SET_OK_NO_PROP_ERRORS | CMD_LOAD);
 
+	//debug printk to confirm CAAM running
+	printk("CAAM setkey\n");
+
 	/* Load iv */
 	if ((ctx->class1_alg_type & (OP_ALG_AAI_MASK << OP_ALG_AAI_SHIFT)) == OP_ALG_AAI_XTS) {
 		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
@@ -2253,6 +2256,8 @@ static int ablkcipher_encrypt(struct ablkcipher_request *req)
 	u32 *desc;
 	int ret = 0;
 
+	printk("CAAM encrypt\n");
+
 	/* allocate extended descriptor */
 	edesc = ablkcipher_edesc_alloc(req, DESC_JOB_IO_LEN *
 				       CAAM_CMD_SZ, &iv_contig);
@@ -2289,6 +2294,8 @@ static int ablkcipher_decrypt(struct ablkcipher_request *req)
 	bool iv_contig;
 	u32 *desc;
 	int ret = 0;
+
+	printk("CAAM decrypt\n");
 
 	/* allocate extended descriptor */
 	edesc = ablkcipher_edesc_alloc(req, DESC_JOB_IO_LEN *

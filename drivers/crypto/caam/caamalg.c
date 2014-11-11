@@ -85,6 +85,7 @@
 
 /* context register field constants for XTS */
 #define CONTEXT_SECIDX_OFFSET		(32 << LDST_OFFSET_SHIFT)
+#define CONTEXT_SECIDX_DISCARD		(48 << LDST_OFFSET_SHIFT)
 #define CONTEXT_SECIDX_LENGTH		8
 #define CONTEXT_SECSZ_OFFSET		(40 << LDST_OFFSET_SHIFT)
 #define CONTEXT_SECSZ_LENGTH		8
@@ -962,9 +963,14 @@ static int ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
 
 	/* Load iv */
 	if ((ctx->class1_alg_type & (OP_ALG_AAI_MASK << OP_ALG_AAI_SHIFT)) == OP_ALG_AAI_XTS) {
+		/* First 8 bytes of IV used as sector index */
 		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
 			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECIDX_OFFSET |
-			   tfm->ivsize);
+			   (tfm->ivsize / 2));
+		/* Last 8 bytes of IV discarded */
+		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
+			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECIDX_DISCARD |
+			   (tfm->ivsize / 2));
 		append_cmd(desc, CMD_LOAD | LDST_CLASS_1_CCB | LDST_IMM |
 			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECSZ_OFFSET |
 			   CONTEXT_SECSZ_LENGTH);
@@ -1015,9 +1021,14 @@ static int ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
 
 	/* load IV */
 	if ((ctx->class1_alg_type & (OP_ALG_AAI_MASK << OP_ALG_AAI_SHIFT)) == OP_ALG_AAI_XTS) {
+		/* First 8 bytes of IV used as sector index */
 		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
 			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECIDX_OFFSET |
-			   tfm->ivsize);
+			   (tfm->ivsize / 2));
+		/* Last 8 bytes of IV discarded */
+		append_cmd(desc, CMD_SEQ_LOAD | LDST_CLASS_1_CCB |
+			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECIDX_DISCARD |
+			   (tfm->ivsize / 2));
 		append_cmd(desc, CMD_LOAD | LDST_CLASS_1_CCB | LDST_IMM |
 			   LDST_SRCDST_BYTE_CONTEXT | CONTEXT_SECSZ_OFFSET |
 			   CONTEXT_SECSZ_LENGTH);
@@ -2804,7 +2815,7 @@ static struct caam_alg_template driver_algs[] = {
 			.decrypt = ablkcipher_decrypt,
 			.min_keysize = 2 * AES_MIN_KEY_SIZE,
 			.max_keysize = 2 * AES_MAX_KEY_SIZE,
-			.ivsize = AES_BLOCK_SIZE / 2,
+			.ivsize = AES_BLOCK_SIZE,
 			},
 		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_XTS,
 		.min_era = 2,
